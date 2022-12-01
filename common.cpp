@@ -1,8 +1,8 @@
 #include "common.h"
 
-const char *shared_memory_name = "shared_memory";
-const char *semaphore_a_name = "sem_a";
-const char *semaphore_b_name = "sem_b";
+const char *const shared_memory_name = "shared_memory";
+const char *const semaphore_a_name = "sem_a";
+const char *const semaphore_b_name = "sem_b";
 
 
 void print_error(const std::string &source) {
@@ -21,8 +21,8 @@ void close_semaphores(sem_t *sem1, sem_t *sem2) {
 }
 
 sem_t *create_semaphore(const char *name) {
-    std::cout << "creating sem " << semaphore_a_name << std::endl;
-    sem_t *sem = sem_open(semaphore_a_name, O_CREAT, 0777, 0);
+    std::cout << "creating semaphore " << name << std::endl;
+    sem_t *sem = sem_open(name, O_CREAT, S_IRWXO | S_IRWXG | S_IRWXU, 0); // NOLINT(cppcoreguidelines-pro-type-vararg)
     if (sem == SEM_FAILED) {
         std::string message = "Cannot open semaphore '";
         message.append(name);
@@ -36,15 +36,13 @@ sem_t *create_semaphore(const char *name) {
 }
 
 int open_shared_memory(const char *name, bool is_read_write) {
-    int flags;
+    int flags = O_RDONLY;
 
     if (is_read_write) {
-        flags |= O_CREAT | O_RDWR;
-    } else {
-        flags |= O_RDONLY;
+        flags = O_CREAT | O_RDWR;
     }
 
-    int shm_handle = shm_open(
+    const int shm_handle = shm_open(
             shared_memory_name,
             flags,
             S_IRWXO | S_IRWXG | S_IRWXU
@@ -63,7 +61,7 @@ int open_shared_memory(const char *name, bool is_read_write) {
 }
 
 int create_shared_memory(const char *name) {
-    int shm_handle = open_shared_memory(name, true);
+    const int shm_handle = open_shared_memory(name, true);
 
     if (ftruncate(shm_handle, shared_memory_size) < 0) {
         std::string message = "Cannot ftruncate shared memory '";
@@ -80,11 +78,11 @@ int create_shared_memory(const char *name) {
 }
 
 void *map_shared_memory(int shm_handle, std::size_t size, bool is_read_write) {
-    int protection = is_read_write
-               ? PROT_READ | PROT_WRITE
-               : PROT_READ;
+    const int protection = is_read_write
+                     ? PROT_READ | PROT_WRITE
+                     : PROT_READ;
 
-    void *addr = mmap(nullptr, shared_memory_size, protection, MAP_SHARED, shm_handle, 0);
+    void *addr = mmap(nullptr, size, protection, MAP_SHARED, shm_handle, 0);
     if (addr == MAP_FAILED) {
         std::string message = "Cannot map shared memory: ";
         message.append(std::strerror(errno));
@@ -93,5 +91,10 @@ void *map_shared_memory(int shm_handle, std::size_t size, bool is_read_write) {
     }
 
     return addr;
+}
+
+std::ostream &operator<<(std::ostream &stream, const Record &r) {
+    stream << r.a << ' ' << r.b << ' ' << r.c << ' ' << r.d;
+    return stream;
 }
 
